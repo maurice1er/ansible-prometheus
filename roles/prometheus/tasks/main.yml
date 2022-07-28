@@ -1,0 +1,92 @@
+- name: 'download prometheus'
+  shell: |
+    sudo useradd -M -r -s /bin/false prometheus 
+    sudo mkdir /etc/prometheus /var/lib/prometheus 
+    wget https://github.com/prometheus/prometheus/releases/download/v2.36.2/prometheus-2.36.2.linux-amd64.tar.gz 
+
+- name: 'extract folder' 
+  shell: |
+    tar xzf prometheus-2.36.2.linux-amd64.tar.gz  
+
+- name: move extraction to /usr/local/bin and /etc 
+  shell: | 
+    sudo cp prometheus-2.36.2.linux-amd64/prometheus /usr/local/bin/
+    sudo cp prometheus-2.36.2.linux-amd64/promtool /usr/local/bin/
+    sudo chown prometheus:prometheus /usr/local/bin/{prometheus,promtool}
+    sudo cp -r prometheus-2.36.2.linux-amd64/{consoles,console_libraries} /etc/prometheus/
+    sudo cp prometheus-2.36.2.linux-amd64/prometheus.yml /etc/prometheus/prometheus.yml
+    sudo chown -R prometheus:prometheus /etc/prometheus
+    sudo chown prometheus:prometheus /var/lib/prometheus   
+
+- name: remove prometheus folder (residu)
+  shell: |
+    sudo rm -rf prometheus*  
+
+- name: set prometheus yml
+  shell: |
+    sudo bash -c 'cat << EOF > /etc/prometheus/prometheus.yml
+    global:
+      scrape_interval:     15s #
+      evaluation_interval: 1s
+      external_labels:
+        monitor: "prometheus" 
+
+    rule_files:
+      - /etc/prometheus/ruleInstanceDown.yml
+      - /etc/prometheus/ruleHighCPUsage.yml
+
+    alerting:
+      alertmanagers:
+      - static_configs:
+        - targets:
+          - localhost:9093
+
+    scrape_configs:
+      - job_name: "prometheus"
+        scrape_interval: {{ prometheus['scrape_interval'] }}
+        static_configs:
+          - targets: ["localhost:9090"]
+
+      - job_name: "{{ prometheus['job_name'] }}"
+        scrape_interval: {{ prometheus['scrape_interval'] }}
+        ec2_sd_configs: 
+          - port: 9100
+            filters:
+              - name: tag:{{ prometheus['filters']['tag_name'] }}
+                values: [{{ prometheus['filters']['tag_value'] }}]
+        relabel_configs:
+          - source_labels: [__meta_ec2_tag_Project, __meta_ec2_tag_Name]
+            separator: "_"
+            target_label: instance
+          - source_labels: [__meta_ec2_instance_id]
+            target_label: instance_id
+          - source_labels: [__meta_ec2_public_dns_name]
+            target_label: public_dns_name
+    EOF'
+
+- name: create prometheus service 
+  shell: |
+    sudo bash -c "cat << EOF > /etc/systemd/system/prometheus.service
+    [Unit]
+    Description=Prometheus Time Series Collection and Processing Server
+    Wants=network-online.target
+    After=network-online.target 
+    [Service]
+    User=prometheus 
+    Group=prometheus
+    Type=simple
+    ExecStart=/usr/local/bin/prometheus --config.file /etc/prometheus/prometheus.yml --storage.tsdb.path /var/lib/prometheus/ --web.console.templates=/etc/prometheus/consoles --web.console.libraries=/etc/prometheus/console_libraries 
+    [Install]
+    WantedBy=multi-user.target
+    EOF"
+
+- name: "write prometheus alert rules file (serverIsDown)"
+  ansible.builtin.copy:
+    src: /home/ubuntu/alertmanager/rules/ruleInstanceDown.yml 
+    dest: /etc/prometheus/ruleInstanceDown.yml 
+
+- name: "write prometheus alert rules file (highCPUsage)"
+  ansible.builtin.copy:
+    src: /home/ubuntu/alertmanager/rules/ruleHighCPUsage.yml
+    dest: /etc/prometheus/ruleHighCPUsage.yml
+

@@ -1,0 +1,13 @@
+groups:
+- name: ServerDown 
+  rules:
+  - alert: InstanceDown
+    expr: up == 0
+    for: 2m
+    labels:
+      severity: 'critical'
+    annotations:
+      summary: "Instance  is down {{ $labels.instance }} "
+      description: " {{ $labels.instance }} of job {{ $labels.job }}  has been down for more than 2 minutes."
+
+

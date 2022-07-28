@@ -1,0 +1,54 @@
+- name: download alertmanager 
+  shell: |
+    wget https://github.com/prometheus/alertmanager/releases/download/v0.21.0/alertmanager-0.21.0.linux-amd64.tar.gz
+
+- name: extract folder
+  shell: |
+    tar xvfz alertmanager-0.21.0.linux-amd64.tar.gz
+
+- name: move extraction to /usr/local/bin and /etc
+  shell: |
+    sudo cp alertmanager-0.21.0.linux-amd64/alertmanager /usr/local/bin
+    sudo cp alertmanager-0.21.0.linux-amd64/amtool /usr/local/bin/
+    sudo mkdir /var/lib/alertmanager
+
+- name: remove prometheus folder (residu)
+  shell: |
+    sudo rm -rf alertmanager*
+
+- name: set prometheus yml 
+  shell: |
+    sudo bash -c 'cat << EOF > /etc/prometheus/alertmanager.yml
+    route:
+      group_by: [Alertname]
+      receiver: yaradatateam@gmail.com
+
+    receivers:
+    - name: {{ alerts['email']['from'] }}
+      email_configs:
+      - to: {{ alerts['email']['to'] }}
+        from: {{ alerts['email']['from'] }}
+        smarthost: {{ alerts['email']['smarthost'] }}
+        auth_username: {{ alerts['email']['from'] }}
+        auth_identity: {{ alerts['email']['from'] }}
+        auth_password: {{ alerts['email']['auth_password'] }}
+
+    EOF'
+
+
+- name: create prometheus service
+  shell: |
+    sudo bash -c "cat << EOF > /etc/systemd/system/alertmanager.service
+    [Unit]
+    Description=Alert Manager
+    Wants=network-online.target
+    After=network-online.target
+    [Service]
+    Type=simple
+    User=prometheus
+    Group=prometheus
+    ExecStart=/usr/local/bin/alertmanager --config.file=/etc/prometheus/alertmanager.yml --storage.path=/var/lib/alertmanager
+    Restart=always
+    [Install]
+    WantedBy=multi-user.target 
+    EOF"
