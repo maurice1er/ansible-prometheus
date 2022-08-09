@@ -21,7 +21,7 @@
     sudo bash -c 'cat << EOF > /etc/prometheus/alertmanager.yml
     route:
       group_by: [Alertname]
-      receiver: yaradatateam@gmail.com
+      receiver: {{ alerts['email']['from'] }}
 
     receivers:
     - name: {{ alerts['email']['from'] }}
