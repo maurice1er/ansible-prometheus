@@ -82,11 +82,11 @@
 
 - name: "write prometheus alert rules file (serverIsDown)"
   ansible.builtin.copy:
-    src: /home/ubuntu/alertmanager/rules/ruleInstanceDown.yml 
+    src: /home/ubuntu/ansible-prometheus-ec2/rules/ruleInstanceDown.yml
     dest: /etc/prometheus/ruleInstanceDown.yml 
 
 - name: "write prometheus alert rules file (highCPUsage)"
   ansible.builtin.copy:
-    src: /home/ubuntu/alertmanager/rules/ruleHighCPUsage.yml
+    src: /home/ubuntu/ansible-prometheus-ec2/rules/ruleHighCPUsage.yml
     dest: /etc/prometheus/ruleHighCPUsage.yml
 
